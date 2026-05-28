@@ -2,4 +2,8 @@
 Background data for the construction of synthetic abstract -- a design of experiments approach
 
 
+# Create a prioritized design
+
+Factors 
+
 

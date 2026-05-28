@@ -192,7 +192,7 @@ make_filler <- function(factor_names, level_labels, existing_runs) {
 build_augmented_design <- function(
   base_design,
   n_replicates = 0,
-  n_extra = 12,
+  n_extra = NULL,
   sweep_factor = NULL,
   include_foldover = TRUE,
   include_filler = TRUE,

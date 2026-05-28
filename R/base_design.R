@@ -15,7 +15,7 @@ list_candidate_oas <- function(nlevels, showmetrics = TRUE) {
   tab <- table(nlevels)
   factors_spec <- list(
     nlevels = as.integer(names(tab)),
-    number  = as.integer(unname(tab))
+    number = as.integer(unname(tab))
   )
   DoE.base::show.oas(factors = factors_spec, showmetrics = showmetrics)
 }
@@ -28,17 +28,22 @@ list_candidate_oas <- function(nlevels, showmetrics = TRUE) {
 #' @param level_labels Optional named list of level labels, one entry
 #'   per factor. Defaults to `1:nlevels[i]`.
 #' @param randomize Logical; randomize run order within the OA.
+#' @param ordered_factors List of ordered factor names.
 #' @param seed Integer seed for reproducibility.
 #' @return A `design` object from [DoE.base::oa.design()].
-build_base_design <- function(nlevels,
-                              factor_names = NULL,
-                              level_labels = NULL,
-                              randomize    = TRUE,
-                              seed         = NULL) {
+build_base_design <- function(
+  nlevels,
+  factor_names = NULL,
+  level_labels = NULL,
+  randomize = FALSE,
+  ordered_factors = NULL,
+  seed = NULL
+) {
   stopifnot(is.numeric(nlevels), length(nlevels) >= 1)
   k <- length(nlevels)
 
   if (is.null(factor_names)) {
+    stopifnot(is.null(ordered_factors))
     factor_names <- paste0("F", seq_len(k))
   }
   stopifnot(length(factor_names) == k)
@@ -48,10 +53,22 @@ build_base_design <- function(nlevels,
   }
   names(level_labels) <- factor_names
 
-  DoE.base::oa.design(
-    nlevels      = nlevels,
+  base_design <- DoE.base::oa.design(
+    nlevels = nlevels,
     factor.names = level_labels,
-    randomize    = randomize,
-    seed         = seed
+    randomize = randomize,
+    seed = seed
   )
+
+  if (!is.null(ordered_factors)) {
+    stopifnot(all(ordered_factors %in% factor_names))
+    for (factor in ordered_factors) {
+      base_design[[factor]] <- ordered(
+        base_design[[factor()]],
+        levels = levels(base_design[[factor]])
+      )
+    }
+  }
+
+  base_design
 }
