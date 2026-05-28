@@ -28,8 +28,8 @@ base_design <- build_base_design(
 # 3. Full tiered plan (all 5 tiers, no budget, deterministic order)
 full_plan <- build_augmented_design(
   base_design = base_design,
-  n_replicates = 6,
-  n_extra = 12,
+  n_replicates = 0,
+  n_extra = NULL,
   sweep_factor = "C",
   include_foldover = TRUE,
   include_filler = TRUE,
@@ -101,3 +101,43 @@ randomized_plan <- build_augmented_design(
 
 # tier column preserved; run_order column added
 utils::head(randomized_plan, 10)
+
+
+# Budget levels to compare
+budgets <- ceiling(seq(from = 80, to = prod(c(4, 4, 5, 4)), length.out = 10))
+factor_names <- c("A", "B", "C", "D")
+
+estimability_table <- do.call(
+  rbind,
+  lapply(budgets, function(b) {
+    plan <- build_augmented_design(
+      base_design,
+      n_replicates = 0,
+      n_extra = NULL,
+      sweep_factor = "C",
+      include_foldover = TRUE,
+      include_filler = TRUE,
+      budget = b,
+      randomize = FALSE,
+      seed = 42
+    )
+
+    tiers <- paste(sort(unique(plan$tier)), collapse = ",")
+
+    est <- check_estimability(plan, factor_names)
+    est$budget <- b
+    est$tiers <- tiers
+    est[, c(
+      "budget",
+      "tiers",
+      "model",
+      "n_runs",
+      "n_params",
+      "qr_rank",
+      "estimable",
+      "residual_df"
+    )]
+  })
+)
+
+estimability_table

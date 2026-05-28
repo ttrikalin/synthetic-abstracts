@@ -50,7 +50,7 @@ make_foldover <- function(base_design, factor_names) {
 #' @param base_design A data frame / design from [build_base_design()].
 #' @param n_replicates Number of replicate rows to draw.
 #' @return A data frame with tier = 3 and source = "replicate".
-make_replicates <- function(base_design, n_replicates = 6) {
+make_replicates <- function(base_design, n_replicates = 0) {
   stopifnot(n_replicates >= 0)
   if (n_replicates == 0) {
     out <- base_design[0, , drop = FALSE]
@@ -71,10 +71,12 @@ make_replicates <- function(base_design, n_replicates = 6) {
 #' For every factor the extreme levels (first and last) are taken;
 #' for the sweep_factor *all* levels are taken.
 #'
+#' This is not a critical tier if the full design is reached.
+#'
 #' @param nlevels Integer vector of levels per factor.
 #' @param factor_names Character vector of factor names.
 #' @param level_labels Named list of level labels.
-#' @param n_extra Number of augmenting runs to keep.
+#' @param n_extra Number of augmenting runs to keep (`NULL` defaults to 3*`p` to get 2FI)
 #' @param sweep_factor Name (or index) of the factor whose levels are
 #'   fully swept.  Defaults to the factor with the most levels.
 #' @return A data frame with tier = 4 and source = "augment".
@@ -82,10 +84,13 @@ make_corner_augment <- function(
   nlevels,
   factor_names,
   level_labels,
-  n_extra = 12,
+  n_extra = NULL,
   sweep_factor = NULL
 ) {
   stopifnot(length(nlevels) == length(factor_names))
+  if (is.null(n_extra)) {
+    n_extra <- min(3 * length(nlevels), prod(nlevels))
+  }
   if (n_extra == 0) {
     empty <- as.data.frame(matrix(ncol = length(factor_names), nrow = 0))
     names(empty) <- factor_names
@@ -186,7 +191,7 @@ make_filler <- function(factor_names, level_labels, existing_runs) {
 #'   tier, and (if randomize = TRUE) run_order.
 build_augmented_design <- function(
   base_design,
-  n_replicates = 6,
+  n_replicates = 0,
   n_extra = 12,
   sweep_factor = NULL,
   include_foldover = TRUE,
@@ -198,6 +203,7 @@ build_augmented_design <- function(
   if (!is.null(seed)) {
     set.seed(seed)
   }
+  #browser()
 
   # -- discover factor metadata from the base design ----------------
   factor_names <- names(base_design)[seq_len(ncol(base_design))]
@@ -213,6 +219,7 @@ build_augmented_design <- function(
   tier1$tier <- 1L
 
   # -- Tier 2: foldover --------------------------------------------
+  tier2 <- tier1[0, , drop = FALSE]
   if (include_foldover) {
     tier2 <- make_foldover(base_design, factor_names)
     # Remove foldover rows that duplicate a base row
@@ -225,29 +232,32 @@ build_augmented_design <- function(
       c(lapply(tier2[factor_names], as.character), list(sep = "|"))
     )
     tier2 <- tier2[!key_t2 %in% key_t1, , drop = FALSE]
-  } else {
-    tier2 <- tier1[0, , drop = FALSE]
   }
 
   # -- Tier 3: replicates ------------------------------------------
-  tier3 <- make_replicates(base_design, n_replicates = n_replicates)
-  tier3 <- tier3[, names(tier1), drop = FALSE]
+  tier3 <- tier1[0, , drop = FALSE]
+  if (n_replicates > 0) {
+    tier3 <- make_replicates(base_design, n_replicates = n_replicates)
+    tier3 <- tier3[, names(tier1), drop = FALSE]
+  }
 
   # -- Tier 4: corner augmentation ----------------------------------
-  tier4 <- make_corner_augment(
-    nlevels = nlevels_vec,
-    factor_names = factor_names,
-    level_labels = level_labels,
-    n_extra = n_extra,
-    sweep_factor = sweep_factor
-  )
+  tier4 <- tier1[0, , drop = FALSE]
+  if (is.null(n_extra) || n_extra > 0) {
+    tier4 <- make_corner_augment(
+      nlevels = nlevels_vec,
+      factor_names = factor_names,
+      level_labels = level_labels,
+      n_extra = n_extra,
+      sweep_factor = sweep_factor
+    )
+  }
 
   # -- Tier 5: full-factorial filler --------------------------------
+  tier5 <- tier1[0, , drop = FALSE]
   if (include_filler) {
     existing <- rbind(tier1, tier2, tier4)
     tier5 <- make_filler(factor_names, level_labels, existing)
-  } else {
-    tier5 <- tier1[0, , drop = FALSE]
   }
 
   # -- Align factor columns and stack in tier order -----------------
@@ -278,4 +288,43 @@ build_augmented_design <- function(
   }
 
   plan
+}
+
+
+# -- Check that the design is 2FI-estimable
+
+# Compare estimability of 1-, 2-, and 3-factor interaction models
+# across budget levels
+
+check_estimability <- function(design, factor_names) {
+  formulas <- list(
+    "main_effects" = as.formula(paste(
+      "~",
+      paste(factor_names, collapse = " + ")
+    )),
+    "two_fi" = as.formula(paste(
+      "~",
+      paste("(", paste(factor_names, collapse = " + "), ")^2")
+    )),
+    "three_fi" = as.formula(paste(
+      "~",
+      paste("(", paste(factor_names, collapse = " + "), ")^3")
+    ))
+  )
+
+  results <- lapply(names(formulas), function(model_name) {
+    mm <- model.matrix(formulas[[model_name]], data = design)
+    rank <- qr(mm)$rank
+    data.frame(
+      model = model_name,
+      n_runs = nrow(design),
+      n_params = ncol(mm),
+      qr_rank = rank,
+      estimable = rank == ncol(mm),
+      residual_df = nrow(design) - rank,
+      stringsAsFactors = FALSE
+    )
+  })
+
+  do.call(rbind, results)
 }
