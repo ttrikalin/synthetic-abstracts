@@ -110,4 +110,11 @@ full_plan <- full_plan[, id := 1:.N][,
 
 fwrite(estimability_table, "designs/estimability_design1.csv")
 fwrite(as.data.table(full_plan), "designs/design1.csv")
-saveRDS(list(full_plan, estimability_table), "designs/design1.rds")
+saveRDS(
+  list(
+    "full_plan" = full_plan,
+    "estimability_table" = estimability_table,
+    "spec" = spec
+  ),
+  "designs/design1.rds"
+)
