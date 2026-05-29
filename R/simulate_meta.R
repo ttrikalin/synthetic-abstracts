@@ -150,6 +150,10 @@ simulate_meta_or <- function(
     )
   }
 
+  out$or_lb <- exp(out$yi + stats::qnorm(0.025) * sqrt(out$vi))
+  out$or_ub <- exp(out$yi - stats::qnorm(0.025) * sqrt(out$vi))
+  out$or_pval <- 2 * stats::pnorm(-abs(out$yi / out$sei))
+
   attr(out, "params") <- list(
     mu_or = mu_or,
     mu = mu,
@@ -163,11 +167,12 @@ simulate_meta_or <- function(
 
 
 get_meta_analysis <- function(ma_data) {
+  #browser()
   res <- metafor::rma.uni(
     data = ma_data,
     yi = yi,
     sei = sei,
-    method = "REML",
+    method = "DL", # "REML",
     measure = "GEN"
   )
   meta <- data.table::data.table(ma_data)
@@ -183,7 +188,7 @@ get_meta_analysis <- function(ma_data) {
 
 
 is_acceptable <- function(ma_results, plan) {
-  browser()
+  # browser()
 
   if (plan$stat_sig_re == "yes" & ma_results$re_mean_pval[1] >= 0.05) {
     return(FALSE)

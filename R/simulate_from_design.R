@@ -184,7 +184,7 @@ simulate_from_design_row <- function(
 #'   [simulate_from_design_row()].
 #' @return A named list of simulated datasets, one per selected row.
 simulate_from_design <- function(plan, rows = NULL, base_seed = 1000L, ...) {
-  browser()
+  #browser()
   plan <- as.data.frame(plan, stringsAsFactors = FALSE)
   if (is.null(rows)) {
     rows <- seq_len(nrow(plan))
@@ -194,9 +194,9 @@ simulate_from_design <- function(plan, rows = NULL, base_seed = 1000L, ...) {
 
   datasets <- vector("list", length(rows))
   for (k in seq_along(rows)) {
+    cat(paste0(k, "."))
     i <- rows[k]
     tmp <- NULL
-    go_on <- TRUE
     j <- 1
     while (TRUE) {
       tmp <- simulate_from_design_row(
@@ -204,15 +204,16 @@ simulate_from_design <- function(plan, rows = NULL, base_seed = 1000L, ...) {
         seed = j * base_seed + ids[k],
         ...
       )
-      tmp <- get_meta_analysis(ma_data = datasets[[k]])
-      if (is_acceptable(ma_results = tmp, plan = plan[i, , drop = FALSE], )) {
+      tmp <- get_meta_analysis(ma_data = tmp)
+      tmp[, id := ids[k]]
+      if (is_acceptable(ma_results = tmp, plan = plan[i, , drop = FALSE])) {
         tmp[, successful_simulation := TRUE]
         break
       } else {
         tmp[, successful_simulation := FALSE]
       }
       j <- j + 1
-      if (j > 300) {
+      if (j > 20000) {
         break
       }
     }
